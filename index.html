@@ -1,1 +1,300 @@
-https://script.google.com/macros/s/AKfycbwN5GhB5HPsxkz-o5qps6kGfYDh_qdOB1L_s41sZdwDmni3aiaWtPKlXuSA7sJBo02sBw/exec
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absensi QR Siswa</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f4f7;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 24px;
+    }
+
+    p {
+      text-align: center;
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #1976d2;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #hasil {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background: #eee;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>📷 ABSENSI QR SISWA</h1>
+
+  <p>SDN SUMBERAGUNG 02</p>
+  <p>Kelas 2</p>
+
+  <div id="reader"></div>
+
+  <h3>Masukkan NIS secara manual</h3>
+
+  <input
+    type="text"
+    id="nis"
+    placeholder="Contoh: 001"
+  >
+
+  <button onclick="absenManual()">
+    ABSEN
+  </button>
+
+  <div id="hasil"></div>
+
+  <h3>Absensi Hari Ini</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>NIS</th>
+        <th>Nama</th>
+        <th>Status</th>
+        <th>Jam</th>
+      </tr>
+    </thead>
+
+    <tbody id="tabelAbsensi">
+      <tr>
+        <td colspan="5">Memuat data...</td>
+      </tr>
+    </tbody>
+  </table>
+
+</div>
+
+<script>
+
+const API_URL =
+"https://script.google.com/macros/s/AKfycbwN5GhB5HPsxkz-o5qps6kGfYDh_qdOB1L_s41sZdwDmni3aiaWtPKlXuSA7sJBo02sBw/exec";
+
+
+function tampilkanHasil(pesan) {
+  document.getElementById("hasil").innerText = pesan;
+}
+
+
+function absenManual() {
+
+  const nis = document.getElementById("nis").value.trim();
+
+  if (!nis) {
+    tampilkanHasil("Silakan masukkan NIS.");
+    return;
+  }
+
+  kirimAbsensi(nis);
+}
+
+
+function kirimAbsensi(nis) {
+
+  tampilkanHasil("Memproses absensi...");
+
+  const script = document.createElement("script");
+
+  const callbackName =
+    "callbackAbsensi" + Date.now();
+
+  window[callbackName] = function(data) {
+
+    if (data.success) {
+      tampilkanHasil(
+        "✅ Absensi berhasil: " +
+        data.nama +
+        " - " +
+        data.status
+      );
+    } else {
+      tampilkanHasil(
+        "❌ " + (data.message || "Absensi gagal.")
+      );
+    }
+
+    document.body.removeChild(script);
+    delete window[callbackName];
+
+    tampilkanAbsensiHariIni();
+  };
+
+  script.src =
+    API_URL +
+    "?action=absen" +
+    "&nis=" + encodeURIComponent(nis) +
+    "&status=Hadir" +
+    "&callback=" + callbackName;
+
+  document.body.appendChild(script);
+}
+
+
+function mulaiScanner() {
+
+  const scanner =
+    new Html5Qrcode("reader");
+
+  scanner.start(
+    { facingMode: "environment" },
+
+    {
+      fps: 10,
+      qrbox: 250
+    },
+
+    function(decodedText) {
+
+      const nis = decodedText.trim();
+
+      kirimAbsensi(nis);
+
+      scanner.stop();
+
+    },
+
+    function(errorMessage) {
+
+    }
+
+  ).catch(function(error) {
+
+    tampilkanHasil(
+      "Kamera tidak dapat digunakan."
+    );
+
+  });
+}
+
+
+function tampilkanAbsensiHariIni() {
+
+  const script = document.createElement("script");
+
+  const callbackName =
+    "callbackList" + Date.now();
+
+  window[callbackName] = function(data) {
+
+    const tabel =
+      document.getElementById("tabelAbsensi");
+
+    tabel.innerHTML = "";
+
+    if (!data.data || data.data.length === 0) {
+
+      tabel.innerHTML =
+        '<tr><td colspan="5">Belum ada absensi.</td></tr>';
+
+    } else {
+
+      data.data.forEach(function(item, index) {
+
+        const row =
+          document.createElement("tr");
+
+        row.innerHTML =
+          "<td>" + (index + 1) + "</td>" +
+          "<td>" + item.nis + "</td>" +
+          "<td>" + item.nama + "</td>" +
+          "<td>" + item.status + "</td>" +
+          "<td>" + item.jam + "</td>";
+
+        tabel.appendChild(row);
+
+      });
+
+    }
+
+    document.body.removeChild(script);
+    delete window[callbackName];
+
+  };
+
+
+  script.src =
+    API_URL +
+    "?action=list" +
+    "&callback=" + callbackName;
+
+  document.body.appendChild(script);
+}
+
+
+mulaiScanner();
+
+tampilkanAbsensiHariIni();
+
+</script>
+
+</body>
+</html>
